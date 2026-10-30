@@ -5,15 +5,16 @@ const verifyToken = require("../middlewares/auth");
 
 const prisma = new PrismaClient();
 
-// ۱. دریافت لیست تیکت‌ها
-// اگر کاربر ادمین باشد همه تیکت‌ها، و اگر کاربر عادی باشد فقط تیکت‌های خودش را می‌بیند
+// ۱. دریافت لیست تیکت‌ها (سازگار با حروف کوچک و بزرگ نقش‌ها)
 router.get("/", verifyToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const userRole = req.user.role;
+    // نرمال‌سازی نقش به حروف بزرگ برای جلوگیری از خطای Case-Sensitivity
+    const userRole = req.user.role ? req.user.role.toUpperCase() : "";
 
     let tickets;
-    if (userRole === "ADMIN") {
+    // اگر کاربر ادمین یا پشتیبان باشد، همه تیکت‌ها را ببیند
+    if (userRole === "ADMIN" || userRole === "SUPPORTER") {
       tickets = await prisma.ticket.findMany({
         orderBy: { createdAt: "desc" },
         include: {
@@ -21,6 +22,7 @@ router.get("/", verifyToken, async (req, res) => {
         },
       });
     } else {
+      // در غیر این صورت فقط تیکت‌های خودش را ببیند
       tickets = await prisma.ticket.findMany({
         where: { authorId: userId },
         orderBy: { createdAt: "desc" },
@@ -64,15 +66,15 @@ router.post("/", verifyToken, async (req, res) => {
   }
 });
 
-// ۳. تغییر وضعیت تیکت (فقط توسط ادمین مجاز است)
+// ۳. تغییر وضعیت تیکت (توسط ادمین یا پشتیبان)
 router.patch("/:id/status", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body; // مقادیر مجاز: "open", "in_progress", "closed"
-    const userRole = req.user.role;
+    const userRole = req.user.role ? req.user.role.toUpperCase() : "";
 
-    // بررسی دسترسی ادمین
-    if (userRole !== "ADMIN") {
+    // بررسی دسترسی ادمین یا پشتیبان
+    if (userRole !== "ADMIN" && userRole !== "SUPPORTER") {
       return res
         .status(403)
         .json({ error: "شما دسترسی لازم برای تغییر وضعیت تیکت را ندارید." });
@@ -101,7 +103,7 @@ router.patch("/:id/status", verifyToken, async (req, res) => {
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const userRole = req.user.role;
+    const userRole = req.user.role ? req.user.role.toUpperCase() : "";
 
     // بررسی دسترسی ادمین
     if (userRole !== "ADMIN") {

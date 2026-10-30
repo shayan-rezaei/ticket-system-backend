@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String        @id @default(uuid())
+  name            String
+  email           String        @unique
+  password        String
+  role            String        @default("requester")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  ticketsCreated  Ticket[]      @relation("TicketAuthor")
+  ticketsAssigned Ticket[]      @relation("TicketAssignee")
+  comments        Comment[]
+  ticketEvents    TicketEvent[]
+}
+
+model Category {
+  id      String   @id @default(uuid())
+  name    String   @unique
+  tickets Ticket[]
+}
+
+model Ticket {
+  id          String        @id @default(uuid())
+  title       String
+  description String        @db.Text
+  status      String        @default("open")
+  priority    String        @default("normal")
+  categoryId  String?       
+  category    Category?     @relation(fields: [categoryId], references: [id])
+  authorId    String
+  author      User          @relation("TicketAuthor", fields: [authorId], references: [id])
+  assigneeId  String?
+  assignee    User?         @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  comments    Comment[]
+  events      TicketEvent[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model TicketEvent {
+  id        String   @id @default(uuid())
+  type      String
+  oldValue  String?
+  newValue  String?
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}

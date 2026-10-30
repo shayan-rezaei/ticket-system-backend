@@ -24,8 +24,11 @@ app.get("/", (req, res) => {
   res.json({ message: "سیستم مدیریت تیکت با موفقیت کار می‌کند!" });
 });
 
-// پورت سرور
+// پورت سرور (برای اجرا روی سیستم لوکال خودتان)
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+// اکسپورت اپلیکیشن برای اجرا روی Vercel
+module.exports = app;

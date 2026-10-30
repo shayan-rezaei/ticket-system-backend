@@ -9,11 +9,9 @@ const prisma = new PrismaClient();
 router.get("/", verifyToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    // نرمال‌سازی نقش به حروف بزرگ برای جلوگیری از خطای Case-Sensitivity
     const userRole = req.user.role ? req.user.role.toUpperCase() : "";
 
     let tickets;
-    // اگر کاربر ادمین یا پشتیبان باشد، همه تیکت‌ها را ببیند
     if (userRole === "ADMIN" || userRole === "SUPPORTER") {
       tickets = await prisma.ticket.findMany({
         orderBy: { createdAt: "desc" },
@@ -22,7 +20,6 @@ router.get("/", verifyToken, async (req, res) => {
         },
       });
     } else {
-      // در غیر این صورت فقط تیکت‌های خودش را ببیند
       tickets = await prisma.ticket.findMany({
         where: { authorId: userId },
         orderBy: { createdAt: "desc" },
@@ -55,7 +52,7 @@ router.post("/", verifyToken, async (req, res) => {
         description,
         priority: priority || "normal",
         authorId: userId,
-        status: "open", // وضعیت پیش‌فرض تیکت
+        status: "open",
       },
     });
 
@@ -70,10 +67,9 @@ router.post("/", verifyToken, async (req, res) => {
 router.patch("/:id/status", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body; // مقادیر مجاز: "open", "in_progress", "closed"
+    const { status } = req.body;
     const userRole = req.user.role ? req.user.role.toUpperCase() : "";
 
-    // بررسی دسترسی ادمین یا پشتیبان
     if (userRole !== "ADMIN" && userRole !== "SUPPORTER") {
       return res
         .status(403)
@@ -99,25 +95,23 @@ router.patch("/:id/status", verifyToken, async (req, res) => {
   }
 });
 
-// ۴. حذف تیکت (فقط توسط ادمین مجاز است)
+// ۴. حذف تیکت (توسط ادمین یا پشتیبان مجاز است)
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userRole = req.user.role ? req.user.role.toUpperCase() : "";
 
-    // بررسی دسترسی ادمین
-    if (userRole !== "ADMIN") {
+    // اصلاح شد: هم ادمین و هم پشتیبان اجازه حذف دارند
+    if (userRole !== "ADMIN" && userRole !== "SUPPORTER") {
       return res
         .status(403)
         .json({ error: "شما اجازه دسترسی به حذف تیکت را ندارید." });
     }
 
-    // ابتدا کامنت‌های مرتبط با تیکت را پاک می‌کنیم تا خطای کلید خارجی رخ ندهد
     await prisma.comment.deleteMany({
       where: { ticketId: id },
     });
 
-    // سپس خود تیکت را حذف می‌کنیم
     await prisma.ticket.delete({
       where: { id },
     });

@@ -5,27 +5,29 @@ const verifyToken = require("../middlewares/auth");
 
 const prisma = new PrismaClient();
 
-// ۱. دریافت لیست تیکت‌ها (سازگار با حروف کوچک و بزرگ نقش‌ها)
+// ۱. دریافت لیست تیکت‌ها (شامل author، assignee و category)
 router.get("/", verifyToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const userRole = req.user.role ? req.user.role.toUpperCase() : "";
 
+    const includeConfig = {
+      author: { select: { id: true, name: true, email: true, role: true } },
+      assignee: { select: { id: true, name: true, email: true } },
+      category: { select: { id: true, name: true } },
+    };
+
     let tickets;
     if (userRole === "ADMIN" || userRole === "SUPPORTER") {
       tickets = await prisma.ticket.findMany({
         orderBy: { createdAt: "desc" },
-        include: {
-          author: { select: { id: true, name: true, email: true, role: true } },
-        },
+        include: includeConfig,
       });
     } else {
       tickets = await prisma.ticket.findMany({
         where: { authorId: userId },
         orderBy: { createdAt: "desc" },
-        include: {
-          author: { select: { id: true, name: true, email: true, role: true } },
-        },
+        include: includeConfig,
       });
     }
 
@@ -36,14 +38,25 @@ router.get("/", verifyToken, async (req, res) => {
   }
 });
 
-// ۲. ایجاد تیکت جدید (عنوان، توضیحات و اولویت)
+// ۲. ایجاد تیکت جدید (همراه با دسته‌بندی و ارجاع به مسئول)
 router.post("/", verifyToken, async (req, res) => {
   try {
-    const { title, description, priority } = req.body;
+    const { title, description, priority, category, assigneeId } = req.body;
     const userId = req.user.userId;
 
     if (!title || !description) {
       return res.status(400).json({ error: "عنوان و شرح درخواست الزامی است." });
+    }
+
+    // پیدا کردن یا ایجاد دسته‌بندی بر اساس نام انتخابی
+    let categoryId = null;
+    if (category) {
+      const catObj = await prisma.category.upsert({
+        where: { name: category },
+        update: {},
+        create: { name: category },
+      });
+      categoryId = catObj.id;
     }
 
     const ticket = await prisma.ticket.create({
@@ -51,8 +64,15 @@ router.post("/", verifyToken, async (req, res) => {
         title,
         description,
         priority: priority || "normal",
+        categoryId: categoryId,
+        assigneeId: assigneeId || null,
         authorId: userId,
         status: "open",
+      },
+      include: {
+        author: { select: { id: true, name: true, email: true } },
+        assignee: { select: { id: true, name: true, email: true } },
+        category: { select: { id: true, name: true } },
       },
     });
 
@@ -101,7 +121,6 @@ router.delete("/:id", verifyToken, async (req, res) => {
     const { id } = req.params;
     const userRole = req.user.role ? req.user.role.toUpperCase() : "";
 
-    // اصلاح شد: هم ادمین و هم پشتیبان اجازه حذف دارند
     if (userRole !== "ADMIN" && userRole !== "SUPPORTER") {
       return res
         .status(403)

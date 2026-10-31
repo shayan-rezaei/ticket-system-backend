@@ -6,7 +6,6 @@ const authRoutes = require("./routes/auth");
 const ticketRoutes = require("./routes/tickets");
 const commentRoutes = require("./routes/comments");
 const categoryRoutes = require("./routes/categories");
-const userRoutes = require("./routes/users"); // اضافه شد: ایمپورت روت کاربران
 
 const app = express();
 
@@ -19,7 +18,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/comments", commentRoutes);
 app.use("/api/categories", categoryRoutes);
-app.use("/api/users", userRoutes); // اضافه شد: ثبت روت کاربران در مسیر /api/users
 
 // مسیر تست اولیه سرور
 app.get("/", (req, res) => {

@@ -38,17 +38,16 @@ router.get("/", verifyToken, async (req, res) => {
   }
 });
 
-// ۲. ایجاد تیکت جدید (همراه با دسته‌بندی و ارجاع به مسئول)
+// ۲. ایجاد تیکت جدید (همراه با دسته‌بندی)
 router.post("/", verifyToken, async (req, res) => {
   try {
-    const { title, description, priority, category, assigneeId } = req.body;
+    const { title, description, priority, category } = req.body;
     const userId = req.user.userId;
 
     if (!title || !description) {
       return res.status(400).json({ error: "عنوان و شرح درخواست الزامی است." });
     }
 
-    // پیدا کردن یا ایجاد دسته‌بندی بر اساس نام انتخابی
     let categoryId = null;
     if (category) {
       const catObj = await prisma.category.upsert({
@@ -65,7 +64,6 @@ router.post("/", verifyToken, async (req, res) => {
         description,
         priority: priority || "normal",
         categoryId: categoryId,
-        assigneeId: assigneeId || null,
         authorId: userId,
         status: "open",
       },
@@ -115,7 +113,38 @@ router.patch("/:id/status", verifyToken, async (req, res) => {
   }
 });
 
-// ۴. حذف تیکت (توسط ادمین یا پشتیبان مجاز است)
+// ۴. ارجاع تیکت به ادمین/پشتیبان (با کلیک روی دکمه ارجاع به من)
+router.patch("/:id/assign", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { assigneeId } = req.body;
+    const userRole = req.user.role ? req.user.role.toUpperCase() : "";
+
+    if (userRole !== "ADMIN" && userRole !== "SUPPORTER") {
+      return res.status(403).json({ error: "شما دسترسی لازم را ندارید." });
+    }
+
+    const updatedTicket = await prisma.ticket.update({
+      where: { id },
+      data: { assigneeId: assigneeId || req.user.userId },
+      include: {
+        assignee: { select: { id: true, name: true, email: true } },
+        author: { select: { id: true, name: true, email: true } },
+        category: { select: { id: true, name: true } },
+      },
+    });
+
+    res.json({
+      message: "تیکت با موفقیت ارجاع داده شد.",
+      ticket: updatedTicket,
+    });
+  } catch (error) {
+    console.error("Assign ticket error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ۵. حذف تیکت (توسط ادمین یا پشتیبان مجاز است)
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
